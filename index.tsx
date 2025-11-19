@@ -1,3 +1,4 @@
+
 /* tslint:disable */
 /**
  * @license
@@ -33,9 +34,6 @@ export class GdmLiveAudio extends LitElement {
   // Audio accumulation for API
   private audioChunks: Float32Array[] = [];
   private recordingLength = 0;
-  
-  // Track if the user is physically holding the button
-  private isHolding = false;
 
   static styles = css`
     #status {
@@ -96,11 +94,6 @@ export class GdmLiveAudio extends LitElement {
       justify-content: center;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      
-      /* Hold button specific styles */
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
     }
 
     button:hover {
@@ -170,13 +163,20 @@ export class GdmLiveAudio extends LitElement {
     this.error = msg;
   }
 
-  private async startRecording(e?: Event) {
-    // Prevent default to ensure touch events don't fire emulated mouse events
-    if (e) e.preventDefault();
-    
+  private async toggleRecording(e: Event) {
+    e.preventDefault();
+    if (this.isProcessing) return;
+
+    if (this.isRecording) {
+      await this.stopRecording();
+    } else {
+      await this.startRecording();
+    }
+  }
+
+  private async startRecording() {
     if (this.isRecording || this.isProcessing) return;
 
-    this.isHolding = true;
     this.inputAudioContext.resume();
     this.audioChunks = [];
     this.recordingLength = 0;
@@ -186,13 +186,6 @@ export class GdmLiveAudio extends LitElement {
         audio: true,
         video: false,
       });
-
-      // Check if user released the button while we were waiting for permission
-      // If they did, we abort immediately.
-      if (!this.isHolding) {
-        stream.getTracks().forEach(track => track.stop());
-        return;
-      }
 
       this.mediaStream = stream;
 
@@ -228,20 +221,12 @@ export class GdmLiveAudio extends LitElement {
     } catch (err) {
       console.error('Error starting recording:', err);
       this.updateError(`Error: ${err.message}`);
-      // Reset state on error
       this.isRecording = false;
-      this.isHolding = false;
       this.cleanupAudio();
     }
   }
 
-  private async stopRecording(e?: Event) {
-    if (e) e.preventDefault();
-    
-    this.isHolding = false;
-
-    // If recording hasn't started yet (e.g., still initializing stream), do nothing.
-    // The startRecording check for !isHolding will handle the cleanup.
+  private async stopRecording() {
     if (!this.isRecording) return;
 
     this.isRecording = false;
@@ -252,7 +237,6 @@ export class GdmLiveAudio extends LitElement {
     // Process Audio
     try {
       const mergedAudio = mergeBuffers(this.audioChunks, this.recordingLength);
-      // If recording was extremely short, we might want to ignore it, but for now we proceed.
       
       const wavData = encodeWAV(mergedAudio, 16000);
       const base64Audio = this.arrayBufferToBase64(wavData.buffer);
@@ -342,12 +326,7 @@ export class GdmLiveAudio extends LitElement {
         <div class="controls">
           <button
             class="${this.isRecording ? 'recording' : ''} ${this.isProcessing ? 'processing' : ''}"
-            @mousedown=${this.startRecording}
-            @touchstart=${this.startRecording}
-            @mouseup=${this.stopRecording}
-            @touchend=${this.stopRecording}
-            @mouseleave=${this.stopRecording}
-            @contextmenu=${(e: Event) => e.preventDefault()}
+            @click=${this.toggleRecording}
             ?disabled=${this.isProcessing}
           >
             ${this.isProcessing
@@ -359,15 +338,16 @@ export class GdmLiveAudio extends LitElement {
                 `
               : this.isRecording 
                 ? html`
-                  <!-- Mic Icon (Active) -->
-                  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px">
-                    <path d="M480-480ZM320-200v-560l440 280-440 280Z" style="display:none"/> <!-- Hidden Play icon path -->
-                    <path d="M320-200v-560l440 280-440 280Z"/>
+                  <!-- Stop/Send Icon (Square) -->
+                   <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px">
+                    <path d="M320-320h320v-320H320v320ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/>
                   </svg>` 
                 : html`
                   <!-- Mic Icon (Idle) -->
                   <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px">
-                    <path d="M320-200v-560l440 280-440 280Z"/>
+                    <path d="M480-480q-33 0-56.5-23.5T400-560v-240q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v240q0 33-23.5 56.5T480-480Zm0 294q-79 0-149-30t-122.5-82.5Q156-351 126-421T96-566q0-11 2.5-20.5t6.5-18.5l54 54Q155-531 155-511q0 136 95 231.5T480-184q70 0 131-28.5t109-81.5l42 42q-58 65-135.5 102.5T480-186Zm313-326L66-886l42-42 727 727-42 42Z" style="display:none"/> <!-- Hidden logic -->
+                    <path d="M480-480q-33 0-56.5-23.5T400-560v-240q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v240q0 33-23.5 56.5T480-480Zm0 294q-79 0-149-30t-122.5-82.5Q156-351 126-421T96-566q0-11 2.5-20.5t6.5-18.5l54 54Q155-531 155-511q0 136 95 231.5T480-184q70 0 131-28.5t109-81.5l42 42q-58 65-135.5 102.5T480-186Zm313-326L66-886l42-42 727 727-42 42Z" style="display:none"/>
+                    <path d="M480-480q-33 0-56.5-23.5T400-560v-240q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v240q0 33-23.5 56.5T480-480Zm0 400q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480h80q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480h80q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/>
                   </svg>`
             }
           </button>
