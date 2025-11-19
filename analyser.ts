@@ -19,7 +19,8 @@ export class Analyser {
   }
 
   update() {
-    this.analyser.getByteFrequencyData(this.dataArray);
+    // Cast to any to prevent 'Uint8Array<ArrayBufferLike> is not assignable to Uint8Array<ArrayBuffer>' build error
+    this.analyser.getByteFrequencyData(this.dataArray as any);
   }
 
   get data() {
