@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # cache: 'npm' removed because package-lock.json does not exist yet
 
       - name: Install dependencies
         run: npm install
