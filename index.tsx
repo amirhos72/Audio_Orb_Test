@@ -277,7 +277,8 @@ export class GdmLiveAudio extends LitElement {
     }
   }
 
-  private arrayBufferToBase64(buffer: ArrayBuffer) {
+  // Updated signature to accept ArrayBufferLike to fix build error
+  private arrayBufferToBase64(buffer: ArrayBuffer | ArrayBufferLike) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
     const len = bytes.byteLength;
